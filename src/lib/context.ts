@@ -4,25 +4,44 @@ import { getEmbeddings } from "./embeddings";
 export async function getMatchesFromEmbeddings(embeddings: number[], filePath: string) {
     
     try {
-        console.log("aqui1")
-        const pinecone = new Pinecone({
-            environment: process.env.PINECONE_ENVIRONMENT!,
-            apiKey: process.env.PINECONE_API_KEY!
-        });
-        console.log("aqui2")
-        const index = pinecone.index('chat-pdfs')
-        console.log("aqui3")
-        const ns = index.namespace(convertToAscii(filePath))
-        console.log("aqui4")
+        // const pinecone = new Pinecone({
+        //     environment: process.env.PINECONE_ENVIRONMENT!,
+        //     apiKey: process.env.PINECONE_API_KEY!
+        // });
+        // const index = pinecone.index('chat-pdfs')
+        // const ns = index.namespace(convertToAscii(filePath))
 
-        const queryResponse = await ns.query({
-            topK: 5,
-            vector: embeddings,
-            includeMetadata: true
+        // const queryResponse = await ns.query({
+        //     topK: 5,
+        //     vector: embeddings,
+        //     includeMetadata: true,
+        //     includeValues: false,
+        // });
+
+        const url = `${process.env.PINECONE_HOST!}/query`;
+
+        const res = await fetch(url, {
+            method: "POST",
+            headers: {
+                accept: "application/json",
+                "Content-Type": "application/json",
+                "Api-Key": process.env.PINECONE_API_KEY!
+            },
+            body: JSON.stringify({
+                includeValues: false,
+                includeMetadata: true,
+                topK: 5,
+                vector: embeddings,
+                namespace: convertToAscii(filePath),
+            })
         })
-        console.log("aqui5")
-        console.log(queryResponse)
-        return queryResponse.matches || []
+
+        // Handle the response
+        if (!res.ok) {
+            throw new Error(`Pinecone API responded with ${res.status}: ${res.statusText}`);
+        }
+        const queryResponse = await res.json();
+        return queryResponse.matches || [];
     } catch (error) {
         console.log('error querying embeddings', error)
         throw error
@@ -30,11 +49,8 @@ export async function getMatchesFromEmbeddings(embeddings: number[], filePath: s
 }
 
 export async function getContext(query: string, filePath: string) {
-    console.log("10")
     const queryEmbeddings = await getEmbeddings(query)
-    console.log("11")
     const matches = await getMatchesFromEmbeddings(queryEmbeddings, filePath)
-    console.log("12")
     const qualifyingDocs = matches.filter(match => match.score && match.score > 0.7)
     
     type Metadata = {

@@ -2,7 +2,7 @@ import { Configuration, OpenAIApi } from 'openai-edge'
 import { Message, OpenAIStream, StreamingTextResponse } from 'ai'
 import { getContext } from '@/lib/context'
 import { db } from '@/lib/db'
-import { chats } from '@/lib/db/schema'
+import { chats, messages as _messages } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
@@ -15,22 +15,14 @@ const openai = new OpenAIApi(config)
 
 export async function POST(req: Request) {
     try {
-        console.log('1')
         const { messages, chatId } = await req.json()
-        console.log('2')
         const _chats = await db.select().from(chats).where(eq(chats.id, chatId))
-        console.log('3')
         if(_chats.length != 1){
             return NextResponse.json({ "error": "chat not found"}, { status: 404 })
         }
-        console.log('4')
         const filePath = _chats[0].pdfKey
-        console.log('5')
         const lastMessage = messages[messages.length - 1]
-        console.log('6')
-        console.log(lastMessage)
         const context = await getContext(lastMessage.content, filePath)
-        console.log('7')
         const prompt = {
             role: "system",
             content: `AI assistant is a brand new, powerful, human-like artificial intelligence.
@@ -47,7 +39,7 @@ export async function POST(req: Request) {
             AI assistant will not apologize for previous responses, but instead will indicated new information was gained.
             AI assistant will not invent anything that is not drawn directly from the context.
             `,
-          };
+        };
 
         const response = await openai.createChatCompletion({
             model: 'gpt-3.5-turbo',
@@ -56,7 +48,22 @@ export async function POST(req: Request) {
             ],
             stream: true
         })
-        const stream = OpenAIStream(response)
+        const stream = OpenAIStream(response, {
+            onStart: async () => {
+                await db.insert(_messages).values({
+                    chatId,
+                    content: lastMessage.content,
+                    role: 'user'
+                })
+            },
+            onCompletion: async (completion) => {
+                await db.insert(_messages).values({
+                    chatId,
+                    content: completion,
+                    role: 'bot'
+                })
+            },
+        })
         return new StreamingTextResponse(stream)
     } catch (error) {
         console.log(error)
