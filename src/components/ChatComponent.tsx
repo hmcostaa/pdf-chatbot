@@ -30,15 +30,17 @@ const ChatComponent = ({ chatId }: { chatId: number }) => {
     })
 
     return (
-        <div>
+        <div className="flex flex-col w-full h-full p-5 justify-between">
             <div>
-                <h1>Chat</h1>
+                <div>
+                    <h1>Chat</h1>
+                </div>
+
+                <MessageList messages={messages} isLoading={isLoading} />
             </div>
 
-            <MessageList messages={messages} isLoading={isLoading} />
-
-            <form onSubmit={handleSubmit}>
-                <Input value={input} onChange={handleInputChange} placeholder="Write your question..." className="w-full" />
+            <form onSubmit={handleSubmit} className="flex w-full pl-5 gap-3">
+                <Input value={input} onChange={handleInputChange} placeholder="Write your question..." className="w-11/12" />
                 <Button>
                     <Send className="w-4 h-4"/>
                 </Button>

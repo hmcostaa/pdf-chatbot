@@ -6,9 +6,9 @@ import { useState } from "react";
 import UploadPdf from "./UploadPdf";
 import { cn } from "@/lib/utils";
 import { MessageCircle, Trash2 } from "lucide-react";
-import { db } from "@/lib/db";
-import { chats as _chats } from '@/lib/db/schema'
-import { eq } from "drizzle-orm";
+import axios from "axios";
+import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 type Props = {
     chats: DrizzleChat[];
@@ -17,7 +17,27 @@ type Props = {
 
 const ChatSideBar = ({ chats, chatId }: Props) => {
 
+    const router = useRouter();
+    
     const [loading, isLoading] = useState(false);
+
+
+    const deleteChat = async (chatId: number | undefined, currentChatId: number) => {
+        
+        const response = await axios.post('/api/delete-chat', {
+            chatId
+        });
+        if(!response.data.pdfName){
+            toast.error("Something went wrong");
+            return;
+        }
+        if(chatId === currentChatId){
+            const chatRedirect = chats.find((chat) => chat.id !== currentChatId);
+            router.push(`/chat/${chatRedirect?.id}`)
+        }
+        toast.success("Chat Deleted!")
+        return;
+    }
 
     return (
         <div className="w-full h-screen max-h-screen p-4 text-gray-200 bg-gray-900 overflow-auto">
@@ -34,8 +54,7 @@ const ChatSideBar = ({ chats, chatId }: Props) => {
                             <p className="w-full overflow-hidden text-sm truncate whitespace-nowrap text-ellipsis">
                                 {chat.pdfName}
                             </p>
-                            {/* call function on the server side component in chat/[chatId] */}
-                            {/* <button onClick={() => deleteChat(chat.id)}><Trash2 className="ml-2"/></button> */}
+                            <button onClick={() => deleteChat(chat.id, chatId)}><Trash2 className="ml-2"/></button>
                         </div>
                     </Link>
                 ))}
